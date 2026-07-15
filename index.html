@@ -38,7 +38,6 @@
   .graph-wrap{flex:1;position:relative;overflow:hidden;}
   #graph{width:100%;height:100%;display:block;touch-action:none;}
 
-  /* verdict banner (top-left overlay) */
   .concl{position:absolute;left:16px;top:14px;max-width:min(430px,calc(100% - 32px));z-index:7;background:rgba(8,10,16,0.84);border:1px solid var(--line);border-radius:12px;padding:12px 15px;backdrop-filter:blur(14px);box-shadow:0 8px 30px rgba(0,0,0,0.5);}
   .concl-top{display:flex;align-items:center;gap:9px;margin-bottom:7px;flex-wrap:wrap;}
   .concl-dot{width:9px;height:9px;border-radius:50%;flex-shrink:0;}
@@ -50,7 +49,6 @@
   .concl-cause b{font-weight:700;}
   @media(max-width:900px){ .concl{left:10px;top:10px;max-width:calc(100% - 20px);} }
 
-  /* decomposition banner (top-right overlay) */
   .decomp{position:absolute;right:16px;top:14px;width:min(300px,calc(100% - 32px));z-index:7;background:rgba(8,10,16,0.84);border:1px solid var(--line);border-radius:12px;padding:12px 14px;backdrop-filter:blur(14px);box-shadow:0 8px 30px rgba(0,0,0,0.5);}
   .decomp-h{font-family:var(--mono);font-size:8.5px;letter-spacing:1.5px;color:var(--faint);text-transform:uppercase;margin-bottom:9px;}
   .decomp-eq{display:flex;align-items:stretch;gap:6px;}
@@ -63,7 +61,6 @@
   .decomp-s b{font-weight:700;}
   @media(max-width:900px){ .decomp{display:none;} }
 
-  /* right panel */
   .panel{width:320px;flex-shrink:0;background:var(--panel);border-left:1px solid var(--line);backdrop-filter:blur(16px);display:flex;flex-direction:column;overflow-y:auto;}
   .panel::-webkit-scrollbar{width:0;}
   .p-gold{padding:16px 16px 12px;border-bottom:1px solid var(--line);}
@@ -123,7 +120,7 @@
       <svg width="13" height="13" viewBox="0 0 24 24" fill="none"><path d="M1 12s4-7 11-7 11 7 11 7-4 7-11 7S1 12 1 12z" stroke="#f5c451" stroke-width="1.4"/><circle cx="12" cy="12" r="3" fill="#f5c451"/></svg>
       THIRDEYE<span>CHART</span>
     </div>
-    <div class="tag">Gold Decomposition Engine · r=g−f$</div>
+    <div class="tag">Gold Decomposition Engine · r=g−f$ · Sprint 1</div>
     <div class="viewtog">
       <button class="vbtn active" id="vbNet">NETWORK</button>
       <button class="vbtn" id="vbGlobe">GLOBE</button>
@@ -170,6 +167,9 @@
       <div class="sec">Hierarki pemacu <span class="h">cause → gold</span></div>
       <div id="drivers"></div>
 
+      <div class="sec">Dial institusi <span class="h">positioning · fear · flow</span></div>
+      <div id="instDials"></div>
+
       <div class="sec">Kualiti data</div>
       <div class="quality" id="qList"></div>
       <div class="qverdict" id="qVerdict"><span class="qdot" style="background:var(--faint);margin-top:3px"></span><span style="color:var(--dim)">Menunggu sumber…</span></div>
@@ -188,11 +188,11 @@
 <script>
 "use strict";
 // ════════════════════════════════════════════════════════════════════
-//  GOLD DECOMPOSITION ENGINE — visual layer
-//  Identity: r(XAUUSD) = g - f_USD  ·  g = r_XAU + f_USD (dollar removed)
-//  Nodes are GOLD-RELEVANT ONLY, arranged by causal layer:
-//    CAUSE (real yield) -> TRANSMISSION (USD, built from currencies)
-//    -> gold-specific g -> price ; silver confirms.
+//  GOLD DECOMPOSITION ENGINE — Sprint 1 (v2)
+//  Identity: r(XAUUSD) = g - f_USD
+//  BARU: GATEWAY runner sendiri · TIADA kunci API dalam fail ini
+//  FRED diambil ikut CSV awam (tanpa kunci) bila runner disekat.
+//  Dial institusi: CROWDING (CFTC COT) · FEAR (GVZ) · WEST-FLOW (GLD) · EFP proksi
 // ════════════════════════════════════════════════════════════════════
 
 const YF   = 'https://query1.finance.yahoo.com/v8/finance/chart/';
@@ -202,12 +202,8 @@ const PROXIES = [
   u => 'https://api.allorigins.win/raw?url=' + encodeURIComponent(u),
   u => 'https://api.codetabs.com/v1/proxy/?quest=' + encodeURIComponent(u),
 ];
-// paste your FRED key OR (better) your Cloudflare Worker URL in GATEWAY
-const FRED_KEY = 'd41473055952cda46c8c73664146b9f8';
-const RY_CONFIGURED = !!FRED_KEY && FRED_KEY.indexOf('PASTE_') !== 0;
-const GATEWAY = ''; // e.g. 'https://gold-gateway.YOURNAME.workers.dev'
-const RY_ON = !!GATEWAY || RY_CONFIGURED;
-const fredUrl = s => 'https://api.stlouisfed.org/fred/series/observations?series_id='+s+'&api_key='+FRED_KEY+'&file_type=json&sort_order=desc&limit=12';
+// Runner Cloudflare ThirdEyeChart — semua laluan utama ikut sini.
+const GATEWAY = 'https://gold-gateway.ajikboy9.workers.dev';
 
 const FX = [
   { sym:'EURUSD=X', ccy:'EUR', usdSign:-1, geo:[50,9]   },
@@ -221,7 +217,6 @@ const FX = [
 const N_CCY = 8;
 const VOL = { g:0.009, xau:0.009, xag:0.016, fusd:0.0030, ry:0.030, tnx:0.020 };
 
-// primary driver nodes (gold-relevant), by causal layer
 const LAYER = { 1:{name:'CAUSE',col:'#f5c451'}, 2:{name:'TRANSMISSION',col:'#5b8def'}, 3:{name:'CONFIRM',col:'#43c9b0'} };
 const PRIMARY = [
   { id:'RY',  name:'Real Yield', sym:'DFII10',  layer:1, base:1.00, geo:[38,-97],
@@ -236,13 +231,16 @@ const PRIMARY = [
 
 // live state
 const ST = { goldSpot:null, goldSpotChg:null, goldSpotT:0, _anchor:null,
-  gc:null, si:null, tnx:null, dxy:null, fx:{}, ry:null, fxT:0, yT:0, ryT:0 };
+  gc:null, si:null, tnx:null, dxy:null, fx:{}, ry:null, fxT:0, yT:0, ryT:0,
+  be:null, beT:0, gvz:null, cot:null, cotT:0, gld:null, gldT:0, efp:null };
 const gHist = [];
-let LAST = null;      // computed engine snapshot (verdict + per-node effects)
+const basisHist = [];
+let LAST = null;
 
 // ── fetch helpers ──
 function withTimeout(p, ms){ return new Promise((res,rej)=>{ const t=setTimeout(()=>rej(new Error('timeout')),ms); p.then(v=>{clearTimeout(t);res(v);},e=>{clearTimeout(t);rej(e);}); }); }
 async function jsonViaProxy(url, ms){ for(const w of PROXIES){ try{ const r=await withTimeout(fetch(w(url),{cache:'no-store'}),ms); if(!r.ok) continue; return await r.json(); }catch(e){} } throw new Error('proxies failed'); }
+async function textViaProxy(url, ms){ for(const w of PROXIES){ try{ const r=await withTimeout(fetch(w(url),{cache:'no-store'}),ms); if(!r.ok) continue; return await r.text(); }catch(e){} } throw new Error('proxies failed'); }
 async function yf(sym, ms){
   let j=null;
   if(GATEWAY){ try{ const r=await withTimeout(fetch(GATEWAY+'/yf?symbol='+encodeURIComponent(sym),{cache:'no-store'}),ms||4500); if(r.ok){ const t=await r.json(); if(t&&t.chart&&t.chart.result&&t.chart.result[0]&&t.chart.result[0].meta) j=t; } }catch(e){} }
@@ -254,15 +252,18 @@ async function yf(sym, ms){
   return { price, prev, r: Math.log(price/prev) };
 }
 async function goldApi(sym, ms){ const r=await withTimeout(fetch(GAPI+sym,{cache:'no-store'}),ms||3500); if(!r.ok) throw new Error('goldapi'); const j=await r.json(); if(j.price==null) throw new Error('px'); return j.price; }
-async function fredRealYield(ms){
-  let j;
-  if(GATEWAY){ const r=await withTimeout(fetch(GATEWAY+'/fred?series=DFII10',{cache:'no-store'}),ms||5000); if(!r.ok) throw new Error('gw fred '+r.status); j=await r.json(); }
-  else if(RY_CONFIGURED){ j=await jsonViaProxy(fredUrl('DFII10'),ms||5000); }
-  else return null;
-  const obs=j&&j.observations; if(!obs||!obs.length) throw new Error('fred empty');
-  const v=[]; for(const o of obs){ const x=parseFloat(o.value); if(!isNaN(x)) v.push(x); if(v.length>=2) break; }
-  if(!v.length) throw new Error('no value');
-  return { level:v[0], dChg:v.length>=2?(v[0]-v[1]):0 };
+
+// FRED tanpa kunci: Laluan A = runner sendiri; Laluan B = CSV awam FRED ikut proxy
+function parseFredObs(obs){ const v=[]; for(const o of obs){ const x=parseFloat(o.value); if(!isNaN(x)) v.push(x); if(v.length>=2) break; } if(!v.length) throw new Error('no value'); return { level:v[0], dChg:v.length>=2?(v[0]-v[1]):0 }; }
+async function fredSeries(series, ms){
+  try{
+    const r=await withTimeout(fetch(GATEWAY+'/fred?series='+series,{cache:'no-store'}),ms||5000);
+    if(r.ok){ const j=await r.json(); if(j&&j.observations&&j.observations.length) return parseFredObs(j.observations); }
+  }catch(e){}
+  const t=await textViaProxy('https://fred.stlouisfed.org/graph/fredgraph.csv?id='+series, ms||7000);
+  const lines=t.trim().split(/\r?\n/); const obs=[];
+  for(let i=lines.length-1;i>=1 && obs.length<4;i--){ const c=lines[i].split(','); if(c.length>=2 && c[1]!=='.') obs.push({ date:c[0], value:c[1] }); }
+  return parseFredObs(obs);
 }
 
 // ── math + engine ──
@@ -285,7 +286,6 @@ function decompose(){
   return { rXau, fUsd, g, fxCov:k };
 }
 
-// full engine snapshot: decomposition, z-scores, per-node effects, verdict
 function computeState(){
   const d=decompose(); const { rXau, fUsd, g, fxCov } = d;
   const zRx=rXau!=null?rXau/VOL.xau:null;
@@ -294,7 +294,6 @@ function computeState(){
   const zRy=ST.ry?ST.ry.dChg/VOL.ry:null;
   const causeBull = zRy!=null? -zRy : null;
 
-  // per-node effect on gold: dir (+bull/-bear/0), mag (0..1), live
   const eff={};
   eff.RY  = ST.ry ? { dir:-Math.sign(ST.ry.dChg||0), mag:clamp(Math.abs(zRy)/2,0,1), live:true } : { dir:0,mag:0,live:false };
   eff.USD = (fUsd!=null) ? { dir:-Math.sign(fUsd), mag:clamp(Math.abs(zF)/2,0,1), live:true } : { dir:0,mag:0,live:false };
@@ -304,7 +303,6 @@ function computeState(){
   eff.CCY={};
   FX.forEach(x=>{ const v=ST.fx[x.sym]; if(v){ const contrib=x.usdSign*v.r; eff.CCY[x.ccy]={ dir:-Math.sign(contrib), mag:clamp(Math.abs(contrib)/0.004/2,0,1)*0.55, live:true, r:v.r }; } else eff.CCY[x.ccy]={ dir:0,mag:0,live:false }; });
 
-  // verdict from g
   let label='—', col=css('--dim');
   let dollarDriven=false;
   if(g!=null){
@@ -326,11 +324,20 @@ function computeState(){
     if(causeBull!=null && Math.abs(zG)>0.25 && Math.abs(zRy)>0.25) c += (Math.sign(causeBull)===Math.sign(zG))?10:-8;
     conf=Math.round(clamp(c,5,94));
   }
-  // normalized momentum for gauge (-1..1)
   const norm = zG!=null ? clamp(zG/2,-1,1) : 0;
 
   LAST = { rXau, fUsd, g, zRx, zG, zF, zRy, causeBull, fxCov, eff, label, col, conf, dollarDriven, norm };
   return LAST;
+}
+
+// EFP proksi: basis GC1 − spot; hanya dislokasi BESAR bermakna
+function efpUpdate(){
+  if(ST.gc && ST.goldSpot!=null){
+    const b=ST.gc.price-ST.goldSpot;
+    basisHist.push(b); if(basisHist.length>400)basisHist.shift();
+    const s=basisHist.slice().sort((a,b2)=>a-b2); const med=s[(s.length/2)|0];
+    ST.efp={ basis:b, med, dev:b-med, alert:(basisHist.length>20 && Math.abs(b-med)>15) };
+  }
 }
 
 // ════════════════════════════════════════════════════════════════════
@@ -349,7 +356,6 @@ function hexA(hex,a){ hex=(hex||'').replace('#',''); if(hex.length<6) return 'rg
 function lighten(hex,amt){ hex=hex.replace('#',''); const r=Math.min(255,parseInt(hex.slice(0,2),16)+amt),g=Math.min(255,parseInt(hex.slice(2,4),16)+amt),b=Math.min(255,parseInt(hex.slice(4,6),16)+amt); return '#'+r.toString(16).padStart(2,'0')+g.toString(16).padStart(2,'0')+b.toString(16).padStart(2,'0'); }
 function roundRectFill(x,y,w,h,r){ if(w<=0)return; r=Math.min(r,w/2,h/2); ctx.beginPath(); ctx.moveTo(x+r,y); ctx.arcTo(x+w,y,x+w,y+h,r); ctx.arcTo(x+w,y+h,x,y+h,r); ctx.arcTo(x,y+h,x,y,r); ctx.arcTo(x,y,x+w,y,r); ctx.closePath(); ctx.fill(); }
 
-// ── nodes (network) ──
 let nodes=[], particles=[], ccyNodes=[];
 function build(){
   nodes=[]; const hubR=Math.max(30,minDim*0.062);
@@ -411,7 +417,6 @@ function edgeColor(dir){ return dir>0?'47,221,154':(dir<0?'246,77,110':'122,132,
 
 function drawNetwork(){
   const hub=nodes[0];
-  // edges hub<->primary
   for(let i=1;i<nodes.length;i++){
     const nd=nodes[i], e=LAST?LAST.eff[nd.id]:{mag:0,dir:0};
     const col=edgeColor(e.dir);
@@ -422,9 +427,7 @@ function drawNetwork(){
     ctx.strokeStyle=grad; ctx.lineWidth=(0.6+e.mag*2.4)*dim;
     ctx.beginPath(); ctx.moveTo(nd.x,nd.y); ctx.lineTo(hub.x,hub.y); ctx.stroke();
   }
-  // currency satellites around USD node
   drawCurrencies();
-  // particles hub edges
   for(const p of particles){
     const nd=nodes[p.edge]; p.t+=p.sp; if(p.t>1)p.t-=1;
     const tt=p.dir>0?p.t:1-p.t, x=nd.x+(hub.x-nd.x)*tt, y=nd.y+(hub.y-nd.y)*tt;
@@ -447,14 +450,11 @@ function drawCurrencies(){
     ccyNodes.push({ ccy:x.ccy, x:px, y:py, r:R, eff:e });
     if(!e.live) return;
     const col=edgeColor(e.dir);
-    // edge ccy -> USD
     ctx.strokeStyle='rgba('+col+','+(0.05+e.mag*0.25)+')'; ctx.lineWidth=0.5+e.mag*1.4;
     ctx.beginPath(); ctx.moveTo(px,py); ctx.lineTo(u.x,u.y); ctx.stroke();
-    // particle
     const pt=(t*(0.4+e.mag)+i*0.3)%1; const tt=e.dir>0?pt:1-pt;
     const qx=px+(u.x-px)*tt, qy=py+(u.y-py)*tt;
     ctx.beginPath(); ctx.fillStyle='rgba('+col+',0.7)'; ctx.arc(qx,qy,1.2,0,6.283); ctx.fill();
-    // node
     const gr=ctx.createRadialGradient(px,py,R*0.2,px,py,R*1.6);
     gr.addColorStop(0,'rgba(8,11,17,0.85)'); gr.addColorStop(1,hexA('#43c9b0',0.4));
     ctx.fillStyle=gr; ctx.beginPath(); ctx.arc(px,py,R,0,6.283); ctx.fill();
@@ -479,17 +479,14 @@ function drawNode(nd,isHub){
   if(isHub){ g.addColorStop(0,'rgba(6,7,12,0.92)'); g.addColorStop(0.68,hexA(c,0.30)); g.addColorStop(1,hexA(c,0.60)); }
   else { g.addColorStop(0,'rgba(7,10,16,0.94)'); g.addColorStop(0.62,hexA(c,0.16)); g.addColorStop(1,hexA(c,0.48)); }
   ctx.fillStyle=g; ctx.beginPath(); ctx.arc(nd.x,nd.y,r,0,6.283); ctx.fill();
-  // scanlines
   ctx.save(); ctx.beginPath(); ctx.arc(nd.x,nd.y,r*0.95,0,6.283); ctx.clip();
   ctx.fillStyle=hexA(c,0.07); for(let yy=-r;yy<r;yy+=4) ctx.fillRect(nd.x-r,nd.y+yy,r*2,0.5);
   const sy=nd.y+Math.sin(t*1.5+nd.seed)*r*0.9; ctx.fillStyle=hexA(lighten(c,80),0.22); ctx.fillRect(nd.x-r,sy-0.7,r*2,1.4); ctx.restore();
   ctx.strokeStyle=hexA(lighten(c,40),hot?0.95:0.6); ctx.lineWidth=hot?1.5:1.1; ctx.beginPath(); ctx.arc(nd.x,nd.y,r,0,6.283); ctx.stroke();
-  // tick ring
   ctx.save(); ctx.translate(nd.x,nd.y); ctx.rotate(t*0.25*(isHub?-1:1)); ctx.strokeStyle=hexA(c,hot?0.55:0.36); ctx.lineWidth=1;
   const ticks=isHub?28:12;
   for(let i=0;i<ticks;i++){ const a=i/ticks*6.283, big=(i%4===0), r1=r*1.16, r2=r*(big?1.30:1.24); ctx.beginPath(); ctx.moveTo(Math.cos(a)*r1,Math.sin(a)*r1); ctx.lineTo(Math.cos(a)*r2,Math.sin(a)*r2); ctx.stroke(); } ctx.restore();
   if(isHub){ ctx.save(); ctx.translate(nd.x,nd.y); ctx.rotate(t*0.12); ctx.strokeStyle=hexA(c,0.32); ctx.lineWidth=1; ctx.setLineDash([2,9]); ctx.beginPath(); ctx.arc(0,0,r*1.64,0,6.283); ctx.stroke(); ctx.setLineDash([]); ctx.restore(); ctx.beginPath(); ctx.arc(nd.x,nd.y,r*0.58,0,6.283); ctx.fillStyle='rgba(4,5,10,0.82)'; ctx.fill(); }
-  // labels
   ctx.textAlign='center'; ctx.textBaseline='middle';
   if(isHub){
     ctx.shadowColor=hexA(c,0.9); ctx.shadowBlur=9; ctx.fillStyle='#ffe9a8'; ctx.font="700 14px 'Space Grotesk',sans-serif"; ctx.fillText('GOLD',nd.x,nd.y-6);
@@ -544,7 +541,6 @@ function drawGlobe(){
   for(let lat=-60;lat<=60;lat+=30){ const la=lat*Math.PI/180,rr=Math.cos(la),yy=Math.sin(la); ctx.beginPath(); let st=false; for(let d=0;d<=360;d+=12){ const a=d*Math.PI/180; const p=rot(Math.cos(a)*rr,yy,Math.sin(a)*rr); ctx.strokeStyle='rgba(80,170,140,'+(p[2]>=0?0.05:0.02)+')'; const sx=cx+p[0]*R,sy=cy+p[1]*R; if(!st){ctx.moveTo(sx,sy);st=true;}else ctx.lineTo(sx,sy);} ctx.stroke(); }
   ctx.beginPath(); ctx.arc(cx,cy,R,0,6.283); ctx.strokeStyle='rgba(245,196,81,0.20)'; ctx.lineWidth=1.5; ctx.stroke();
   const pj=g.pts.map(pt=>{ const pr=proj(pt.v); const e=eGlobe(pt); return { pt, sx:pr[0], sy:pr[1], depth:pr[2], e }; });
-  // arcs to gold hub
   pj.forEach(o=>{ const near=(o.depth+1)/2; const col=edgeColor(o.e.dir); const mid=[o.pt.v[0]*0.5,o.pt.v[1]*0.5,o.pt.v[2]*0.5]; const mv=proj([mid[0]*1.35,mid[1]*1.35,mid[2]*1.35]); ctx.strokeStyle='rgba('+col+','+(0.05+near*0.22*o.e.mag)+')'; ctx.lineWidth=0.6+near*1.8*o.e.mag; ctx.beginPath(); ctx.moveTo(cx,cy); ctx.quadraticCurveTo(mv[0],mv[1],o.sx,o.sy); ctx.stroke(); o._mid=mv;
     const pt2=((t*(0.4+o.e.mag))%1); const tt=o.e.dir>0?pt2:1-pt2; const u=1-tt; const px=u*u*cx+2*u*tt*mv[0]+tt*tt*o.sx, py=u*u*cy+2*u*tt*mv[1]+tt*tt*o.sy; if(o.e.live){ ctx.beginPath(); ctx.fillStyle='rgba('+col+','+(0.5+near*0.4)+')'; ctx.shadowColor='rgba('+col+',0.9)'; ctx.shadowBlur=6; ctx.arc(px,py,1.4,0,6.283); ctx.fill(); ctx.shadowBlur=0; } });
   pj.sort((a,b)=>a.depth-b.depth); globeHit=pj.map(o=>({ id:o.pt.id, sx:o.sx, sy:o.sy, depth:o.depth, ccy:o.pt.ccy }));
@@ -553,7 +549,6 @@ function drawGlobe(){
     let cg=ctx.createRadialGradient(o.sx,o.sy,rr*0.1,o.sx,o.sy,rr); cg.addColorStop(0,'rgba(8,11,17,'+(0.7*al)+')'); cg.addColorStop(1,hexA(c,0.5*al)); ctx.fillStyle=cg; ctx.beginPath(); ctx.arc(o.sx,o.sy,rr,0,6.283); ctx.fill();
     ctx.strokeStyle=hexA(o.e.dir>0?'#2fdd9a':(o.e.dir<0?'#f64d6e':lighten(c,40)),0.7*al); ctx.lineWidth=1; ctx.stroke();
     if(near>0.42){ ctx.textAlign='center'; ctx.textBaseline='middle'; ctx.shadowColor=hexA(c,0.9); ctx.shadowBlur=6; ctx.fillStyle=hexA(lighten(c,90),al); ctx.font="600 "+(o.pt.ccy?7:8)+"px 'JetBrains Mono',monospace"; ctx.fillText(o.pt.id,o.sx,o.sy-rr-6); ctx.shadowBlur=0; } });
-  // gold hub
   const hubR=Math.min(W,H)*0.048*g.zoom, gp=1+Math.sin(t*2)*0.05;
   let hg=ctx.createRadialGradient(cx,cy,hubR*0.2,cx,cy,hubR*3); hg.addColorStop(0,'rgba(245,196,81,0.5)'); hg.addColorStop(0.5,'rgba(245,196,81,0.12)'); hg.addColorStop(1,'rgba(245,196,81,0)'); ctx.fillStyle=hg; ctx.beginPath(); ctx.arc(cx,cy,hubR*3*gp,0,6.283); ctx.fill();
   let cg2=ctx.createRadialGradient(cx,cy,hubR*0.1,cx,cy,hubR); cg2.addColorStop(0,'rgba(255,240,200,0.95)'); cg2.addColorStop(0.5,'rgba(245,196,81,0.85)'); cg2.addColorStop(1,'rgba(214,160,23,0.6)'); ctx.fillStyle=cg2; ctx.beginPath(); ctx.arc(cx,cy,hubR,0,6.283); ctx.fill();
@@ -636,36 +631,76 @@ function buildDrivers(){
   });
 }
 
+// ── DIAL INSTITUSI (Sprint 1) ──
+function buildInstDials(){
+  const wrap=document.getElementById('instDials'); if(!wrap) return;
+  const mk=(id,name,sub)=>'<div class="drow" style="cursor:default"><span class="ddot" id="idd_'+id+'" style="background:var(--faint)"></span>'+
+    '<span class="dname">'+name+'<small>'+sub+'</small></span>'+
+    '<span class="dval"><span id="idv_'+id+'">—</span><small id="idn_'+id+'">&nbsp;</small></span></div>';
+  wrap.innerHTML= mk('COT','Crowding','CFTC managed money · mingguan')
+                + mk('GVZ','Fear','Cboe GVZ · vol opsyen gold')
+                + mk('GLD','West-Flow','GLD tan · ETF Barat')
+                + mk('EFP','EFP proksi','GC1 − spot · dislokasi shj');
+}
+function setDial(id,dotCol,val,valCol,note){
+  const d=document.getElementById('idd_'+id),v=document.getElementById('idv_'+id),n=document.getElementById('idn_'+id);
+  if(!d||!v||!n) return;
+  d.style.background=dotCol; v.textContent=val; v.style.color=valCol; n.textContent=note;
+}
+function renderInstDials(){
+  if(ST.cot){
+    const c=ST.cot; let lab,pcol;
+    if(c.pct>=90){lab='SESAK LONG';pcol=css('--red');}
+    else if(c.pct>=75){lab='BERAT LONG';pcol='#f7a3b3';}
+    else if(c.pct<=10){lab='TERCUCI';pcol=css('--green');}
+    else if(c.pct<=25){lab='RINGAN';pcol='#8fd6b4';}
+    else {lab='NEUTRAL';pcol=css('--gold');}
+    setDial('COT',pcol,'P'+c.pct+' · '+(c.net/1000).toFixed(0)+'k',pcol,lab+' · '+(c.tan>=0?'+':'')+c.tan.toFixed(0)+'t · w/w '+(c.velTan>=0?'+':'')+c.velTan.toFixed(0)+'t');
+  } else setDial('COT',css('--faint'),'—',css('--dim'),'memuat (mingguan · Sab pagi MY)');
+  if(ST.gvz){
+    const gv=ST.gvz.price; let lab,col2;
+    if(gv>35){lab='PANIK';col2=css('--red');} else if(gv>25){lab='TINGGI';col2='#f7a3b3';} else if(gv>=15){lab='NORMAL';col2=css('--gold');} else {lab='TENANG';col2=css('--green');}
+    setDial('GVZ',col2,gv.toFixed(1),col2,lab+' · '+(ST.gvz.r>=0?'naik':'turun')+' hari ini (heuristik)');
+  } else setDial('GVZ',css('--faint'),'—',css('--dim'),'memuat');
+  if(ST.gld){
+    const w=ST.gld; const up=w.d5>=0;
+    setDial('GLD',up?css('--green'):css('--red'),w.tan.toFixed(0)+'t',up?css('--green'):css('--red'),'D5 '+(up?'+':'')+w.d5.toFixed(1)+'t '+(up?'Barat masuk':'Barat keluar'));
+  } else setDial('GLD',css('--faint'),'—',css('--dim'),'sumber belum sah · senyap');
+  if(ST.efp){
+    const e=ST.efp;
+    if(e.alert) setDial('EFP',css('--violet'),'$'+e.basis.toFixed(1),css('--violet'),'DISLOKASI? dev '+(e.dev>=0?'+':'')+e.dev.toFixed(1));
+    else setDial('EFP',css('--faint'),'$'+e.basis.toFixed(1),css('--dim'),'normal (carry) · senyap');
+  } else setDial('EFP',css('--faint'),'—',css('--dim'),'menunggu GC + spot');
+}
+
 function renderPanel(){
   const v=LAST; if(!v) return;
-  // gold headline
   if(ST.goldSpot!=null){
     setTxt('gPrice',fmtPrice(ST.goldSpot));
     if(ST.goldSpotChg!=null){ const c=document.getElementById('gChg'); c.textContent=(ST.goldSpotChg>=0?'+':'')+ST.goldSpotChg.toFixed(2)+'%'; c.style.color=ST.goldSpotChg>=0?css('--green'):css('--red'); }
     setTxt('gAge','tick '+Math.max(0,Math.round((Date.now()-ST.goldSpotT)/1000))+'s');
   }
-  // conclusion banner
   const cd=document.getElementById('cDot'); cd.style.background=v.col; cd.style.boxShadow='0 0 8px '+v.col;
   setTxt('cVerdict','GOLD '+v.label,v.col);
   setTxt('cConf',v.conf!=null?v.conf+'% keyakinan':'—');
   let ct;
   if(v.g==null) ct='Menunggu data penuh (gold + bakul FX).';
   else if(v.dollarDriven) ct='Gold bergerak, tapi <b>faktor gold-sendiri hampir sifar</b>. Ini cerita dollar, bukan gold.';
-  else ct='Selepas buang dollar, permintaan gold tulen '+(v.zG>=0?'menyokong naik':'menekan turun')+' pada <b>'+fmtBp(v.g)+' bp</b> ('+fmtZ(v.zG)+'σ).';
+  else ct='Selepas buang dollar, permintaan gold tulen '+(v.zG>=0?'menyokong naik':'menekan turun')+' pada <b>'+fmtBp(v.g)+' bp</b> ('+fmtZ(v.zG)+'&sigma;).';
   document.getElementById('cText').innerHTML=ct;
-  // cause line
   const cc=document.getElementById('cCause');
+  let jenis='';
+  if(ST.ry && ST.be){ const dN=ST.ry.dChg+ST.be.dChg; jenis=' · jenis '+(Math.abs(ST.be.dChg)>=Math.abs(dN)?'INFLASI':'KADAR'); }
   if(v.causeBull!=null && v.g!=null && Math.abs(v.zG)>0.15){
     cc.style.display='block';
     const aligned=Math.sign(v.causeBull)===Math.sign(v.zG);
     const ryDir=v.zRy>0?'real yield naik':'real yield turun';
     cc.innerHTML = aligned
-      ? 'Cause ⟷ price: <b style="color:'+css('--green')+'">SEJAJAR</b> — '+ryDir+' selari dgn gold-sendiri. Konviksi tinggi.'
-      : 'Cause ⟷ price: <b style="color:'+css('--gold')+'">BERCANGGAH</b> — gold-sendiri lawan '+ryDir+'. Safe-haven/tak lestari. Hati-hati.';
-  } else if(RY_ON && !ST.ry){ cc.style.display='block'; cc.innerHTML='<span style="color:'+css('--dim')+'">Real yield: memuat DFII10…</span>'; }
+      ? 'Cause &#8596; price: <b style="color:'+css('--green')+'">SEJAJAR</b> — '+ryDir+' selari dgn gold-sendiri'+jenis+'. Konviksi tinggi.'
+      : 'Cause &#8596; price: <b style="color:'+css('--gold')+'">BERCANGGAH</b> — gold-sendiri lawan '+ryDir+jenis+'. Safe-haven/tak lestari. Hati-hati.';
+  } else if(!ST.ry){ cc.style.display='block'; cc.innerHTML='<span style="color:'+css('--dim')+'">Real yield: memuat DFII10 (tanpa kunci)…</span>'; }
   else cc.style.display='none';
 
-  // decomposition banner
   const zRx=v.zRx, zG=v.zG, zF=v.zF;
   setTxt('eRx',v.rXau!=null?fmtBp(v.rXau):'—',v.rXau!=null?(v.rXau>=0?css('--green'):css('--red')):css('--dim'));
   setTxt('eRxz',zRx!=null?pTag(zRx):'\u00a0');
@@ -675,10 +710,9 @@ function renderPanel(){
   setTxt('eFz',zF!=null?pTag(zF):'\u00a0');
   const es=document.getElementById('eSentence');
   if(v.g!=null){ const rb=bp(v.rXau),gb=bp(v.g),db=-bp(v.fUsd);
-    es.innerHTML='<b style="color:'+(v.g>=0?css('--gold'):css('--red'))+'">'+(gb>=0?'+':'')+gb.toFixed(0)+'</b> gold-sendiri, <b style="color:'+(db>=0?css('--green'):css('--blue'))+'">'+(db>=0?'+':'')+db.toFixed(0)+'</b> dollar → total '+(rb>=0?'+':'')+rb.toFixed(0)+' bp. Bakul '+v.fxCov+'/7.';
+    es.innerHTML='<b style="color:'+(v.g>=0?css('--gold'):css('--red'))+'">'+(gb>=0?'+':'')+gb.toFixed(0)+'</b> gold-sendiri, <b style="color:'+(db>=0?css('--green'):css('--blue'))+'">'+(db>=0?'+':'')+db.toFixed(0)+'</b> dollar &rarr; total '+(rb>=0?'+':'')+rb.toFixed(0)+' bp. Bakul '+v.fxCov+'/7.';
   } else es.textContent='Menunggu data…';
 
-  // driver rows
   PRIMARY.forEach(p=>{
     const e=v.eff[p.id]||{dir:0,mag:0,live:false};
     const dot=document.getElementById('dd_'+p.id), val=document.getElementById('dv_'+p.id), note=document.getElementById('dn_'+p.id);
@@ -687,7 +721,6 @@ function renderPanel(){
     dot.style.background=e.live?dcol:css('--faint');
     if(p.id==='RY'){
       if(ST.ry){ const up=ST.ry.dChg>=0; val.textContent=ST.ry.level.toFixed(2)+'%'; val.style.color=up?css('--red'):css('--green'); note.textContent=((ST.ry.dChg*100)>=0?'+':'')+(ST.ry.dChg*100).toFixed(1)+'bp '+(up?'headwind':'tailwind'); }
-      else if(!RY_ON){ val.textContent='set key'; val.style.color=css('--gold'); note.textContent='FRED/Worker'; }
       else { val.textContent='—'; note.textContent='memuat'; }
     } else if(p.id==='USD'){
       if(v.fUsd!=null){ val.textContent=fmtBp(v.fUsd)+'bp'; val.style.color=v.fUsd>=0?css('--blue'):css('--dim'); note.textContent=(ST.dxy?'DXY '+ST.dxy.price.toFixed(2)+' · ':'')+(v.fUsd>=0?'USD kuat':'USD lemah'); } else { val.textContent='—'; note.textContent='bakul '+v.fxCov+'/7'; }
@@ -698,6 +731,7 @@ function renderPanel(){
     }
   });
 
+  renderInstDials();
   renderQuality();
   drawSpark();
 }
@@ -708,9 +742,13 @@ function renderQuality(){
     { n:'Gold spot', ok:ST.goldSpot!=null, age:ST.goldSpotT?Math.round((now-ST.goldSpotT)/1000):null },
     { n:'Gold daily', ok:!!ST.gc, age:ST.yT?Math.round((now-ST.yT)/1000):null },
     { n:'Bakul USD', ok:(v?v.fxCov:0)>=5, age:ST.fxT?Math.round((now-ST.fxT)/1000):null, extra:(v?v.fxCov:0)+'/7' },
-    { n:'Real yield', ok:!!ST.ry, age:ST.ryT?Math.round((now-ST.ryT)/1000):null, pending:!RY_ON?'set key':null },
+    { n:'Real yield', ok:!!ST.ry, age:ST.ryT?Math.round((now-ST.ryT)/1000):null },
+    { n:'Breakeven', ok:!!ST.be, age:ST.beT?Math.round((now-ST.beT)/1000):null },
     { n:'10Y ^TNX', ok:!!ST.tnx, age:ST.yT?Math.round((now-ST.yT)/1000):null },
     { n:'Silver', ok:!!ST.si, age:ST.yT?Math.round((now-ST.yT)/1000):null },
+    { n:'COT CFTC', ok:!!ST.cot, age:ST.cotT?Math.round((now-ST.cotT)/1000):null },
+    { n:'GVZ fear', ok:!!ST.gvz, age:ST.yT?Math.round((now-ST.yT)/1000):null },
+    { n:'GLD ETF', ok:!!ST.gld, age:ST.gldT?Math.round((now-ST.gldT)/1000):null, pending:!ST.gld?'senyap':null },
   ];
   document.getElementById('qList').innerHTML=rows.map(r=>{
     const col=r.ok?css('--green'):(r.pending?css('--gold'):css('--red'));
@@ -718,8 +756,8 @@ function renderQuality(){
     return '<div class="qrow"><span class="qdot" style="background:'+col+'"></span><span class="qname">'+r.n+'</span><span class="qstat" style="color:'+(r.ok?css('--dim'):col)+'">'+stat+'</span></div>';
   }).join('');
   const okc=rows.filter(r=>r.ok).length; const q=document.getElementById('qVerdict'); let msg,col;
-  if(okc>=5&&(v?v.fxCov:0)>=6){ msg='Data cukup — g + cause yakin.'; col=css('--green'); }
-  else if(okc>=3){ msg='Data separa — sahkan.'; col=css('--gold'); }
+  if(okc>=7&&(v?v.fxCov:0)>=6){ msg='Data cukup — g + cause + dial yakin.'; col=css('--green'); }
+  else if(okc>=4){ msg='Data separa — sahkan.'; col=css('--gold'); }
   else { msg='Data tak cukup. Jangan ikut buta.'; col=css('--red'); }
   q.innerHTML='<span class="qdot" style="background:'+col+';margin-top:3px"></span><span style="color:'+col+'">'+msg+'</span>';
 }
@@ -740,7 +778,7 @@ function drawSpark(){
 // ── data loops ──
 function setStatus(t,col){ const e=document.getElementById('status'); if(e){ e.textContent=t; e.style.color=col||css('--dim'); } }
 function stampStatus(){ const live=[ST.goldSpot!=null&&'gold',ST.gc&&'daily',(Object.keys(ST.fx).length>=5)&&'fx',ST.tnx&&'yield'].filter(Boolean); const p=n=>String(n).padStart(2,'0'); const d=new Date(); const ts=p(d.getHours())+':'+p(d.getMinutes()); if(live.length>=3)setStatus('LIVE · '+ts,css('--green')); else if(live.length)setStatus('SEPARA · '+ts,css('--gold')); else setStatus('OFFLINE',css('--red')); }
-function refreshAll(){ computeState(); renderPanel(); spawn(); }
+function refreshAll(){ efpUpdate(); computeState(); renderPanel(); spawn(); }
 
 async function pollGold(){
   try{ const p=await goldApi('XAU'); if(ST.gc&&ST.gc.prev>0)ST.goldSpotChg=(p-ST.gc.prev)/ST.gc.prev*100; else if(ST._anchor)ST.goldSpotChg=(p-ST._anchor)/ST._anchor*100; if(!ST._anchor)ST._anchor=p; ST.goldSpot=p; ST.goldSpotT=Date.now(); }catch(e){}
@@ -752,12 +790,55 @@ async function pollYahoo(){
   jobs.push(yf('SI=F').then(x=>{ST.si=x;}).catch(()=>{}));
   jobs.push(yf('^TNX').then(x=>{ST.tnx=x;}).catch(()=>{}));
   jobs.push(yf('DX-Y.NYB').then(x=>{ST.dxy=x;}).catch(()=>{}));
+  jobs.push(yf('^GVZ').then(x=>{ST.gvz=x;}).catch(()=>{}));
   FX.forEach(f=>jobs.push(yf(f.sym).then(x=>{ST.fx[f.sym]=x;}).catch(()=>{})));
   await Promise.all(jobs); ST.yT=Date.now(); ST.fxT=Date.now();
   const d=decompose(); if(d.g!=null){ gHist.push(d.g/VOL.g); if(gHist.length>180)gHist.shift(); }
   refreshAll(); stampStatus();
 }
-async function pollFred(){ try{ const ry=await fredRealYield(); if(ry){ ST.ry=ry; ST.ryT=Date.now(); } }catch(e){} refreshAll(); stampStatus(); }
+async function pollFred(){
+  try{ const ry=await fredSeries('DFII10'); if(ry){ ST.ry=ry; ST.ryT=Date.now(); } }catch(e){}
+  try{ const be=await fredSeries('T10YIE'); if(be){ ST.be=be; ST.beT=Date.now(); } }catch(e){}
+  refreshAll(); stampStatus();
+}
+async function pollCot(){
+  try{
+    const r=await withTimeout(fetch(GATEWAY+'/cot',{cache:'no-store'}),9000);
+    let j=await r.json(); if(j&&j.rows)j=j.rows;
+    if(Array.isArray(j)&&j.length>5){
+      const pk=(o,pat)=>{const k=Object.keys(o).find(kk=>pat.test(kk));return k?parseFloat(o[k]):NaN;};
+      const rows=j.map(o=>({date:String(o.report_date_as_yyyy_mm_dd||'').slice(0,10),L:pk(o,/m_money.*long/),S:pk(o,/m_money.*short/)})).filter(x=>isFinite(x.L)&&isFinite(x.S));
+      if(rows.length>5){
+        const net=rows.map(x=>x.L-x.S);
+        const cur=net[0], hist=net.slice(0,Math.min(156,net.length));
+        const pct=Math.round(100*hist.filter(vv=>vv<=cur).length/hist.length);
+        ST.cot={ date:rows[0].date, net:cur, tan:cur/321.507, pct, velTan:net.length>1?(cur-net[1])/321.507:0 };
+        ST.cotT=Date.now();
+      }
+    }
+  }catch(e){}
+  refreshAll();
+}
+async function pollGld(){
+  try{
+    const r=await withTimeout(fetch(GATEWAY+'/gld',{cache:'no-store'}),9000);
+    if(r.ok){
+      const txt=await r.text(); const lines=txt.trim().split(/\r?\n/);
+      if(lines.length>10){
+        const head=lines[0].split(','); const iT=head.findIndex(h=>/tonne/i.test(h));
+        if(iT>=0){
+          const rows=lines.slice(1).map(l=>l.split(',')).filter(c=>c.length>iT&&isFinite(parseFloat(c[iT])));
+          if(rows.length>6){
+            const last=rows[rows.length-1], prev=rows[Math.max(0,rows.length-6)];
+            ST.gld={ date:last[0], tan:parseFloat(last[iT]), d5:parseFloat(last[iT])-parseFloat(prev[iT]) };
+            ST.gldT=Date.now();
+          }
+        }
+      }
+    }
+  }catch(e){}
+  refreshAll();
+}
 
 function setView(v){ view=v; document.getElementById('vbNet').classList.toggle('active',v==='net'); document.getElementById('vbGlobe').classList.toggle('active',v==='globe');
   const show=id=>document.getElementById(id).style.display=''; const hide=id=>document.getElementById(id).style.display='none';
@@ -771,11 +852,12 @@ document.getElementById('mobtog').addEventListener('click',()=>document.getEleme
 function tickClock(){ const d=new Date(),p=n=>String(n).padStart(2,'0'); document.getElementById('clock').textContent=p(d.getUTCHours())+':'+p(d.getUTCMinutes())+' UTC'; }
 
 function init(){
-  resize(); computeState(); build(); buildGlobe(); buildDrivers(); renderPanel();
+  resize(); computeState(); build(); buildGlobe(); buildDrivers(); buildInstDials(); renderPanel();
   tickClock(); setInterval(tickClock,20000);
   frame();
-  pollYahoo(); pollGold(); pollFred();
+  pollYahoo(); pollGold(); pollFred(); pollCot(); pollGld();
   setInterval(pollGold,5000); setInterval(pollYahoo,45000); setInterval(pollFred,300000);
+  setInterval(pollCot,21600000); setInterval(pollGld,3600000);
   window.addEventListener('resize',()=>{ resize(); build(); drawSpark(); });
 }
 init();
